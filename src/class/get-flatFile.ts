@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 import { navigateTo } from '../Router';
 import { RenderGrafic } from './render-grafic';
+import { DownloadController } from './download-file';
 
 class FileViewer {
 	private rootSelector: string;
@@ -18,16 +19,25 @@ class FileViewer {
 		if (!root) return;
 
 		root.innerHTML = /*html*/`
-			<button class="deleteFile">Delete File</button>	
+			<button class="deleteFile">Exit</button>	
+			<button class="dwlData">Download</button>
 			<form>
 				<input id="filterInput" class="filter-value" type="text" placeholder="Filter...">
 				<div id="fileContent"></div>
 				<div id="chart"></div>
+
 			</form>
 		`;
 
 		const filterValueElement = document.querySelector('.filter-value') as HTMLInputElement;
 		const fileContentElement = document.getElementById('fileContent');
+
+		const downloadButton = document.querySelector('.dwlData') as HTMLButtonElement;
+		downloadButton.addEventListener('click', (e) => {
+			e.preventDefault();
+			const dowFile = new DownloadController();
+			dowFile.downloadCSV();
+		});
 
 		const deleteFileButton = document.querySelector('.deleteFile') as HTMLButtonElement;
 		deleteFileButton.addEventListener('click', () => {
@@ -143,6 +153,7 @@ class FileViewer {
 		createPage(start, end);
 
 		const prevButton = document.createElement('button');
+		prevButton.className = 'prev';
 		prevButton.textContent = 'Prev';
 		prevButton.disabled = this.currentPage === 1;
 		prevButton.addEventListener('click', (event) => {
@@ -154,6 +165,7 @@ class FileViewer {
 		});
 
 		const nextButton = document.createElement('button');
+		nextButton.className = 'next';
 		nextButton.textContent = 'Next';
 		nextButton.disabled = this.currentPage === totalPages;
 		nextButton.addEventListener('click', (event) => {
@@ -165,6 +177,7 @@ class FileViewer {
 		});
 
 		const pageIndicator = document.createElement('span');
+		pageIndicator.className = 'page-ind'
 		pageIndicator.textContent = `Page ${this.currentPage} of ${totalPages}`;
 
 		const paginationControls = document.createElement('div');

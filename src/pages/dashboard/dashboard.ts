@@ -3,11 +3,14 @@ import { navigateTo } from "../../Router";
 export function Dashboard() {
 	const root = document.querySelector('.root') as HTMLDivElement;
 	root.innerHTML = /*html*/`
+	<div class="container">	
+	<h1 class='title'>Welcome</h1>
 		<form class="ff">
-			<label for="arch1">Select a CSV file:</label>
+			<label class='arch2'for="arch1">Select a CSV file:</label>
 			<input class="arch1" type="file" accept=".csv">
 			<button type="submit">Upload</button>
 		</form>
+	</div>
 	`;
 
 	const formElement = root.querySelector('form') as HTMLFormElement;
