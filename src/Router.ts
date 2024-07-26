@@ -6,6 +6,13 @@ export function Router(){
     const publicRoutes = routes.Public.find(route => route.path === path)
 
     if(publicRoutes){
+        if(path === '/home' && !localStorage.getItem('csvContent')){
+            navigateTo('/')
+            return
+        }
+    }
+
+    if(publicRoutes){
         publicRoutes.page()
         return
     }
