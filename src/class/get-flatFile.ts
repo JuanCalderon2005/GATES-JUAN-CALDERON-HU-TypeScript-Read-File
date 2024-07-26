@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { navigateTo } from '../Router';
 
 class FileViewer {
 	private rootSelector: string;
@@ -15,56 +16,47 @@ class FileViewer {
 		if (!root) return;
 
 		root.innerHTML = /*html*/`
+			<button class="deleteFile">Delete File</button>	
 			<form>
-				<input class='arch' type="file" accept=".csv">
-				<select class='filter-column'></select>
-				<input id="filterInput" class='filter-value' type="text" placeholder="Filter...">
+				<input id="filterInput" class="filter-value" type="text" placeholder="Filter...">
 				<div id="fileContent"></div>
 			</form>
 		`;
 
-		const inputElement = document.querySelector('.arch') as HTMLInputElement;
 		const filterValueElement = document.querySelector('.filter-value') as HTMLInputElement;
 		const fileContentElement = document.getElementById('fileContent');
 
-		inputElement.addEventListener('change', (event) => {
-			event.preventDefault();
-			this.handleFileChange(event, fileContentElement);
+		const deleteFileButton = document.querySelector('.deleteFile') as HTMLButtonElement;
+		deleteFileButton.addEventListener('click', () => {
+			localStorage.removeItem('csvContent');
+			localStorage.removeItem('filterValue');
+			navigateTo('/');
 		});
+
+		
 
 		filterValueElement.addEventListener('input', (event) => {
 			event.preventDefault();
 			this.handleFilterChange(event, fileContentElement);
 		});
-	}
 
-	private handleFileChange(event: Event, fileContentElement: HTMLElement | null): void {
-		const input = event.target as HTMLInputElement;
-		const file = input.files ? input.files[0] : null;
-		if (!file) return;
-
-		const reader = new FileReader();
-		reader.onload = (e) => {
-			const content = e.target?.result as string;
-			if (fileContentElement && content) {
-				this.parseCSV(content, fileContentElement);
-			}
-		};
-		reader.readAsText(file);
+		this.loadDataFromLocalStorage(fileContentElement);
 	}
 
 	private handleFilterChange(event: Event, fileContentElement: HTMLElement | null): void {
-		const filterColumnElement = document.querySelector('.filter-column') as HTMLSelectElement;
 		const filterValueElement = event.target as HTMLInputElement;
-		const filterColumn = filterColumnElement.value;
 		const filterValue = filterValueElement.value.toLowerCase();
 
-		this.filteredData = this.data.filter(row =>
-			String(row[filterColumn]).toLowerCase().includes(filterValue)
+		this.filteredData = this.data.filter(row => 
+			Object.values(row).some(value => 
+				String(value).toLowerCase().includes(filterValue)
+			)
 		);
 		if (fileContentElement) {
 			this.displayData(this.filteredData, fileContentElement);
 		}
+
+		this.saveStateToLocalStorage();
 	}
 
 	private parseCSV(content: string, fileContentElement: HTMLElement): void {
@@ -73,24 +65,12 @@ class FileViewer {
 			complete: (result) => {
 				this.data = result.data;
 				this.filteredData = this.data;
-				this.populateFilterOptions(result.meta.fields || []);
 				this.displayData(this.data, fileContentElement);
+				this.saveStateToLocalStorage();
 			},
 			error: (error: any) => {
-				console.error('Error al parsear el CSV:', error);
+				console.error('Error parsing CSV:', error);
 			}
-		});
-	}
-
-	private populateFilterOptions(fields: string[]): void {
-		const filterColumnElement = document.querySelector('.filter-column') as HTMLSelectElement;
-		filterColumnElement.innerHTML = ''; // Clear existing options
-
-		fields.forEach(field => {
-			const option = document.createElement('option');
-			option.value = field;
-			option.textContent = field;
-			filterColumnElement.appendChild(option);
 		});
 	}
 
@@ -100,14 +80,14 @@ class FileViewer {
 
 		const rowsPerPage = 15;
 		let currentPage = 1;
-		let totalPages = Math.ceil(data.length / rowsPerPage);
+		const totalPages = Math.ceil(data.length / rowsPerPage);
 
 		if (data.length === 0) {
 			fileContentElement.innerHTML = 'No matching records found';
 			return;
 		}
 
-		let keys = Object.keys(data[0]);
+		const keys = Object.keys(data[0]);
 
 		keys.forEach(key => {
 			const th = document.createElement('th');
@@ -135,6 +115,7 @@ class FileViewer {
 
 		const prevButton = document.createElement('button');
 		prevButton.textContent = 'Prev';
+		prevButton.disabled = currentPage === 1;
 		prevButton.addEventListener('click', (event) => {
 			event.preventDefault();
 			if (currentPage > 1) {
@@ -145,6 +126,7 @@ class FileViewer {
 
 		const nextButton = document.createElement('button');
 		nextButton.textContent = 'Next';
+		nextButton.disabled = currentPage === totalPages;
 		nextButton.addEventListener('click', (event) => {
 			event.preventDefault();
 			if (currentPage < totalPages) {
@@ -153,8 +135,12 @@ class FileViewer {
 			}
 		});
 
+		const pageIndicator = document.createElement('span');
+		pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
+
 		const paginationControls = document.createElement('div');
 		paginationControls.appendChild(prevButton);
+		paginationControls.appendChild(pageIndicator);
 		paginationControls.appendChild(nextButton);
 
 		fileContentElement.innerHTML = '';
@@ -165,7 +151,38 @@ class FileViewer {
 			const start = (currentPage - 1) * rowsPerPage;
 			const end = start + rowsPerPage;
 			createPage(start, end);
+			pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
+			prevButton.disabled = currentPage === 1;
+			nextButton.disabled = currentPage === totalPages;
 		};
+	}
+
+	private saveStateToLocalStorage(): void {
+		localStorage.setItem('csvContent', JSON.stringify(this.data));
+		const filterValueElement = document.querySelector('.filter-value') as HTMLInputElement;
+		localStorage.setItem('filterValue', filterValueElement.value);
+	}
+
+	private loadDataFromLocalStorage(fileContentElement: HTMLElement | null): void {
+		const storedContent = localStorage.getItem('csvContent');
+		const storedFilterValue = localStorage.getItem('filterValue');
+
+		if (storedContent) {
+			this.parseCSV(storedContent, fileContentElement as HTMLElement);
+
+			if (storedFilterValue) {
+				const filterValueElement = document.querySelector('.filter-value') as HTMLInputElement;
+				filterValueElement.value = storedFilterValue;
+				this.filteredData = this.data.filter(row => 
+					Object.values(row).some(value => 
+						String(value).toLowerCase().includes(storedFilterValue.toLowerCase())
+					)
+				);
+			}
+			if (fileContentElement) {
+				this.displayData(this.filteredData, fileContentElement);
+			}
+		}
 	}
 }
 
