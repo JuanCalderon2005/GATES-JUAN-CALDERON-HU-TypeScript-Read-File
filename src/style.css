@@ -101,3 +101,9 @@ label {
 .arch1:hover {
     border-color: #888;
 }
+
+#chart{
+	margin-top: 20px;
+	width: 100%;
+	height: 400px;
+}

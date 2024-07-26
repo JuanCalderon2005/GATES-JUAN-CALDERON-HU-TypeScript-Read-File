@@ -1,10 +1,12 @@
 import Papa from 'papaparse';
 import { navigateTo } from '../Router';
+import { RenderGrafic } from './render-grafic';
 
 class FileViewer {
 	private rootSelector: string;
 	private data: any[] = [];
 	private filteredData: any[] = [];
+	private currentPage: number = 1;
 
 	constructor(rootSelector: string) {
 		this.rootSelector = rootSelector;
@@ -20,6 +22,7 @@ class FileViewer {
 			<form>
 				<input id="filterInput" class="filter-value" type="text" placeholder="Filter...">
 				<div id="fileContent"></div>
+				<div id="chart"></div>
 			</form>
 		`;
 
@@ -34,11 +37,22 @@ class FileViewer {
 			navigateTo('/');
 		});
 
-		
-
 		filterValueElement.addEventListener('input', (event) => {
 			event.preventDefault();
 			this.handleFilterChange(event, fileContentElement);
+			const dataGrafic = localStorage.getItem('filteredData') ? JSON.parse(localStorage.getItem('filteredData') || '[]') : [];
+			const renderGrafif = new RenderGrafic();
+			const countM = renderGrafif.countMunicipiosByDepartment(dataGrafic);
+			const arrayDep=renderGrafif.separateDepartmentCounts(countM);
+
+			localStorage.setItem('department', JSON.stringify(arrayDep.departments));
+			localStorage.setItem('counts', JSON.stringify(arrayDep.counts));
+
+			renderGrafif.getOptionchart1();
+			renderGrafif.initchart();
+
+			
+
 		});
 
 		this.loadDataFromLocalStorage(fileContentElement);
@@ -53,6 +67,11 @@ class FileViewer {
 				String(value).toLowerCase().includes(filterValue)
 			)
 		);
+
+		// Guardar los datos filtrados en localStorage
+		localStorage.setItem('filteredData', JSON.stringify(this.filteredData));
+
+		this.currentPage = 1; // Reset to the first page on filter change
 		if (fileContentElement) {
 			this.displayData(this.filteredData, fileContentElement);
 		}
@@ -71,6 +90,7 @@ class FileViewer {
 			},
 			error: (error: any) => {
 				console.error('Error parsing CSV:', error);
+				fileContentElement.innerHTML = 'Error parsing CSV file.';
 			}
 		});
 	}
@@ -80,7 +100,6 @@ class FileViewer {
 		const headerRow = table.insertRow();
 
 		const rowsPerPage = 15;
-		let currentPage = 1;
 		const totalPages = Math.ceil(data.length / rowsPerPage);
 
 		if (data.length === 0) {
@@ -110,34 +129,43 @@ class FileViewer {
 			}
 		};
 
-		const start = (currentPage - 1) * rowsPerPage;
+		const updatePage = () => {
+			const start = (this.currentPage - 1) * rowsPerPage;
+			const end = start + rowsPerPage;
+			createPage(start, end);
+			pageIndicator.textContent = `Page ${this.currentPage} of ${totalPages}`;
+			prevButton.disabled = this.currentPage === 1;
+			nextButton.disabled = this.currentPage === totalPages;
+		};
+
+		const start = (this.currentPage - 1) * rowsPerPage;
 		const end = start + rowsPerPage;
 		createPage(start, end);
 
 		const prevButton = document.createElement('button');
 		prevButton.textContent = 'Prev';
-		prevButton.disabled = currentPage === 1;
+		prevButton.disabled = this.currentPage === 1;
 		prevButton.addEventListener('click', (event) => {
 			event.preventDefault();
-			if (currentPage > 1) {
-				currentPage--;
+			if (this.currentPage > 1) {
+				this.currentPage--;
 				updatePage();
 			}
 		});
 
 		const nextButton = document.createElement('button');
 		nextButton.textContent = 'Next';
-		nextButton.disabled = currentPage === totalPages;
+		nextButton.disabled = this.currentPage === totalPages;
 		nextButton.addEventListener('click', (event) => {
 			event.preventDefault();
-			if (currentPage < totalPages) {
-				currentPage++;
+			if (this.currentPage < totalPages) {
+				this.currentPage++;
 				updatePage();
 			}
 		});
 
 		const pageIndicator = document.createElement('span');
-		pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
+		pageIndicator.textContent = `Page ${this.currentPage} of ${totalPages}`;
 
 		const paginationControls = document.createElement('div');
 		paginationControls.appendChild(prevButton);
@@ -147,20 +175,15 @@ class FileViewer {
 		fileContentElement.innerHTML = '';
 		fileContentElement.appendChild(table);
 		fileContentElement.appendChild(paginationControls);
-
-		const updatePage = () => {
-			const start = (currentPage - 1) * rowsPerPage;
-			const end = start + rowsPerPage;
-			createPage(start, end);
-			pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
-			prevButton.disabled = currentPage === 1;
-			nextButton.disabled = currentPage === totalPages;
-		};
 	}
 
 	public saveStateToLocalStorage(): void {
-        localStorage.setItem('data', JSON.stringify(this.data));
-    }
+		localStorage.setItem('data', JSON.stringify(this.data));
+		const filterValueElement = document.querySelector('.filter-value') as HTMLInputElement;
+		if (filterValueElement) {
+			localStorage.setItem('filterValue', filterValueElement.value);
+		}
+	}
 
 	private loadDataFromLocalStorage(fileContentElement: HTMLElement | null): void {
 		const storedContent = localStorage.getItem('csvContent');
@@ -177,6 +200,7 @@ class FileViewer {
 						String(value).toLowerCase().includes(storedFilterValue.toLowerCase())
 					)
 				);
+				this.currentPage = 1; // Reset to the first page on load
 			}
 			if (fileContentElement) {
 				this.displayData(this.filteredData, fileContentElement);
