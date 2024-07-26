@@ -28,6 +28,7 @@ class FileViewer {
 
 		const deleteFileButton = document.querySelector('.deleteFile') as HTMLButtonElement;
 		deleteFileButton.addEventListener('click', () => {
+			localStorage.removeItem('data');
 			localStorage.removeItem('csvContent');
 			localStorage.removeItem('filterValue');
 			navigateTo('/');
@@ -157,11 +158,9 @@ class FileViewer {
 		};
 	}
 
-	private saveStateToLocalStorage(): void {
-		localStorage.setItem('csvContent', JSON.stringify(this.data));
-		const filterValueElement = document.querySelector('.filter-value') as HTMLInputElement;
-		localStorage.setItem('filterValue', filterValueElement.value);
-	}
+	public saveStateToLocalStorage(): void {
+        localStorage.setItem('data', JSON.stringify(this.data));
+    }
 
 	private loadDataFromLocalStorage(fileContentElement: HTMLElement | null): void {
 		const storedContent = localStorage.getItem('csvContent');
